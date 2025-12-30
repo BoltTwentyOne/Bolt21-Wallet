@@ -103,21 +103,35 @@ class _SendScreenState extends State<SendScreen> {
       }
     }
 
-    // Check if this should route via LND (BOLT11 when LND connected)
+    // Determine routing: LND > Community Node > Breez
     final useLnd = wallet.shouldUseLndForDestination(input);
+    final isBolt11 = _paymentType == 'BOLT11 Invoice';
 
     String? operationId;
     String successMessage = 'Payment sent!';
 
     if (useLnd) {
-      // Route via user's LND node for near-zero fees
+      // Route via user's own LND node (highest priority)
       operationId = await wallet.sendPaymentViaLnd(
         input,
         amountSat: amountSat?.toInt(),
       );
       successMessage = 'Payment sent via ${wallet.lndNodeInfo?.alias ?? "your node"}!';
-      // Haptic feedback for LND payment
       HapticFeedback.mediumImpact();
+    } else if (isBolt11 && wallet.isCommunityNodeEnabled) {
+      // Try Community Node for BOLT11 (if enabled)
+      operationId = await wallet.sendPaymentViaCommunityNode(
+        input,
+        amountSat: amountSat?.toInt(),
+      );
+      if (operationId != null) {
+        successMessage = 'Payment sent via Community Node!';
+        HapticFeedback.mediumImpact();
+      } else if (wallet.error == null) {
+        // Community node unavailable - fallback to Breez
+        operationId = await wallet.sendPaymentIdempotent(input, amountSat: amountSat);
+        successMessage = 'Payment sent via Breez (Community Node offline)';
+      }
     } else {
       // Use Breez SDK (for BOLT12, on-chain, Lightning Address, etc.)
       operationId = await wallet.sendPaymentIdempotent(input, amountSat: amountSat);
@@ -296,7 +310,7 @@ class _SendScreenState extends State<SendScreen> {
                       ],
                     ),
                   ),
-                  // Show "via Your Node" badge when LND will be used
+                  // Show routing badge when LND or Community Node will be used
                   if (_paymentType == 'BOLT11 Invoice' && wallet.isLndConnected)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -317,6 +331,30 @@ class _SendScreenState extends State<SendScreen> {
                           Text(
                             'via ${wallet.lndNodeInfo?.alias ?? "Your Node"}',
                             style: const TextStyle(color: Bolt21Theme.success),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_paymentType == 'BOLT11 Invoice' && wallet.isCommunityNodeEnabled)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.people,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'via Community Node${wallet.communityNodeStatus?.online == true ? "" : " (offline)"}',
+                            style: const TextStyle(color: Colors.blue),
                           ),
                         ],
                       ),

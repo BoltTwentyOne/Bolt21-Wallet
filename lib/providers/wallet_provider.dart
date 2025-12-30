@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
 import 'package:synchronized/synchronized.dart';
 import '../models/wallet_metadata.dart';
+import '../services/community_node_service.dart';
 import '../services/lightning_service.dart';
 import '../services/lnd_service.dart';
 import '../services/notification_service.dart';
@@ -14,6 +15,7 @@ import '../utils/secure_logger.dart';
 class WalletProvider extends ChangeNotifier {
   final LightningService _lightningService = LightningService();
   final LndService _lndService = LndService();
+  final CommunityNodeService _communityNodeService = CommunityNodeService();
   final OperationStateService _operationStateService = OperationStateService();
 
   // Atomic mutex lock to prevent concurrent payment operations (TOCTOU-safe)
@@ -72,6 +74,11 @@ class WalletProvider extends ChangeNotifier {
   bool get isLndConnected => _lndConnected;
   LndNodeInfo? get lndNodeInfo => _lndNodeInfo;
   LndBalance? get lndBalance => _lndBalance;
+
+  // Community Node getters
+  CommunityNodeService get communityNodeService => _communityNodeService;
+  bool get isCommunityNodeEnabled => _communityNodeService.isEnabled;
+  CommunityNodeStatus? get communityNodeStatus => _communityNodeService.status;
 
   // Derived getters
   int get totalBalanceSats {
@@ -177,6 +184,9 @@ class WalletProvider extends ChangeNotifier {
 
       // Check for LND node connection (hybrid mode)
       await _checkLndConnection();
+
+      // Initialize community node service
+      await _communityNodeService.initialize();
     } catch (e) {
       _error = e.toString();
       SecureLogger.error('Wallet initialization error', error: e, tag: 'Wallet');
@@ -313,6 +323,47 @@ class WalletProvider extends ChangeNotifier {
       _paymentInProgress = false;
       _setLoading(false);
     }
+  }
+
+  /// Enable or disable community node routing
+  Future<void> setCommunityNodeEnabled(bool enabled) async {
+    if (enabled) {
+      await _communityNodeService.enable();
+    } else {
+      await _communityNodeService.disable();
+    }
+    notifyListeners();
+  }
+
+  /// Send payment via Community Node (for all BOLT11 invoices)
+  /// Returns operation ID on success, null on failure (triggers fallback)
+  Future<String?> sendPaymentViaCommunityNode(String paymentRequest, {int? amountSat}) async {
+    if (!_communityNodeService.isEnabled) return null;
+
+    final result = await _communityNodeService.payInvoice(
+      invoice: paymentRequest,
+      amountSat: amountSat,
+    );
+
+    if (result == null) {
+      // Network error - trigger fallback
+      return null;
+    }
+
+    if (result.success) {
+      SecureLogger.info(
+        'Payment via Community Node: ${result.amountSat} sats (fee: ${result.feeSat})',
+        tag: 'Community',
+      );
+      // Refresh balance
+      await _refreshAll();
+      return result.paymentHash ?? 'community_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    // Payment failed but node responded - don't fallback, show error
+    _error = result.error ?? 'Community node payment failed';
+    notifyListeners();
+    return null;
   }
 
   /// Automatically recover stuck swaps that have been pending too long

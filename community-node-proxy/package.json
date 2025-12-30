@@ -1,0 +1,11 @@
+{
+  "name": "bolt21-community-node-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Bolt21 Community Node routing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "CA Hodl",
+  "license": "MIT"
+}

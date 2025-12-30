@@ -141,6 +141,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Use your own LND node for sends',
             onTap: () => _showConnectNode(context),
           ),
+          Consumer<WalletProvider>(
+            builder: (context, wallet, _) => _SettingsTile(
+              icon: Icons.people,
+              title: 'Community Node',
+              subtitle: wallet.isCommunityNodeEnabled
+                  ? 'Enabled - lower fees via shared node'
+                  : 'Route payments via community node',
+              onTap: () => _showCommunityNode(context),
+            ),
+          ),
           _SettingsTile(
             icon: Icons.electrical_services,
             title: 'Channels',
@@ -255,6 +265,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ConnectNodeScreen()),
+    );
+  }
+
+  void _showCommunityNode(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Bolt21Theme.darkCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _CommunityNodeSheet(),
     );
   }
 
@@ -761,6 +783,340 @@ class _LspConfigSheet extends StatelessWidget {
           const Text('• Voltage Flow (voltage.cloud)'),
           const Text('• Megalith (megalithic.me)'),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sheet for Community Node configuration with privacy disclosure
+class _CommunityNodeSheet extends StatefulWidget {
+  const _CommunityNodeSheet();
+
+  @override
+  State<_CommunityNodeSheet> createState() => _CommunityNodeSheetState();
+}
+
+class _CommunityNodeSheetState extends State<_CommunityNodeSheet> {
+  bool _isLoading = false;
+
+  Future<void> _toggleCommunityNode(bool enable) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final wallet = context.read<WalletProvider>();
+      await wallet.setCommunityNodeEnabled(enable);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(enable
+                ? 'Community Node enabled'
+                : 'Community Node disabled'),
+            backgroundColor: Bolt21Theme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Bolt21Theme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<WalletProvider>(
+      builder: (context, wallet, _) {
+        final isEnabled = wallet.isCommunityNodeEnabled;
+        final status = wallet.communityNodeStatus;
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollController) {
+            return ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(24),
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Bolt21Theme.textSecondary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Row(
+                  children: [
+                    Icon(Icons.people, color: Colors.blue, size: 28),
+                    SizedBox(width: 12),
+                    Text(
+                      'Community Node',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Route BOLT11 payments through a community-operated Lightning node for potentially lower fees.',
+                  style: TextStyle(color: Bolt21Theme.textSecondary),
+                ),
+                const SizedBox(height: 24),
+
+                // Status card
+                if (isEnabled && status != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: status.online
+                          ? Bolt21Theme.success.withValues(alpha: 0.1)
+                          : Bolt21Theme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: status.online
+                            ? Bolt21Theme.success.withValues(alpha: 0.3)
+                            : Bolt21Theme.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          status.online ? Icons.check_circle : Icons.warning,
+                          color: status.online ? Bolt21Theme.success : Bolt21Theme.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                status.online ? 'Online' : 'Offline (will use Breez)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: status.online ? Bolt21Theme.success : Bolt21Theme.error,
+                                ),
+                              ),
+                              if (status.online) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${status.channels} channels • ${_formatSats(status.spendable)} spendable',
+                                  style: const TextStyle(
+                                    color: Bolt21Theme.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Privacy disclosure
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Bolt21Theme.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Bolt21Theme.orange.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.privacy_tip, color: Bolt21Theme.orange, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Privacy Notice',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Bolt21Theme.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'When using the Community Node, the node operator can see:',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      SizedBox(height: 8),
+                      _PrivacyItem(text: 'Payment amounts'),
+                      _PrivacyItem(text: 'Payment destinations (invoices)'),
+                      _PrivacyItem(text: 'Your IP address (if not using VPN/Tor)'),
+                      SizedBox(height: 12),
+                      Text(
+                        'The node operator cannot access your wallet, seed phrase, or on-chain funds.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Bolt21Theme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Benefits
+                const Text(
+                  'Benefits',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const _BenefitItem(
+                  icon: Icons.savings,
+                  text: 'Lower fees than Breez/Liquid swaps',
+                ),
+                const _BenefitItem(
+                  icon: Icons.bolt,
+                  text: 'Direct Lightning routing (no swaps)',
+                ),
+                const _BenefitItem(
+                  icon: Icons.autorenew,
+                  text: 'Automatic fallback to Breez if offline',
+                ),
+                const SizedBox(height: 24),
+
+                // Toggle switch
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Bolt21Theme.darkBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Enable Community Node',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            isEnabled ? 'Currently enabled' : 'Currently disabled',
+                            style: const TextStyle(
+                              color: Bolt21Theme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Switch(
+                              value: isEnabled,
+                              onChanged: _toggleCommunityNode,
+                              activeThumbColor: Colors.blue,
+                              activeTrackColor: Colors.blue.withValues(alpha: 0.5),
+                            ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Note about own node
+                if (wallet.isLndConnected)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Bolt21Theme.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Bolt21Theme.success, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your own node (${wallet.lndNodeInfo?.alias}) takes priority over Community Node.',
+                            style: const TextStyle(
+                              color: Bolt21Theme.success,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatSats(int sats) {
+    if (sats >= 1000000) {
+      return '${(sats / 1000000).toStringAsFixed(2)}M sats';
+    } else if (sats >= 1000) {
+      return '${(sats / 1000).toStringAsFixed(1)}k sats';
+    }
+    return '$sats sats';
+  }
+}
+
+class _PrivacyItem extends StatelessWidget {
+  final String text;
+
+  const _PrivacyItem({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          const Text('  •  ', style: TextStyle(color: Bolt21Theme.orange)),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+}
+
+class _BenefitItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _BenefitItem({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.blue, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
