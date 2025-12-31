@@ -28,7 +28,27 @@ class PriceService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _btcPriceUsd = (data['bitcoin']['usd'] as num).toDouble();
+        final newPrice = (data['bitcoin']['usd'] as num).toDouble();
+
+        // SECURITY: Sanity check - reject extreme price changes (likely MITM)
+        if (_btcPriceUsd != null) {
+          final percentChange = ((newPrice - _btcPriceUsd!) / _btcPriceUsd!).abs();
+          if (percentChange > 0.5) {
+            SecureLogger.warn(
+              'Price change too large (${(percentChange * 100).toStringAsFixed(1)}%), possible manipulation',
+              tag: 'Price',
+            );
+            return; // Keep old price, don't trust suspicious data
+          }
+        }
+
+        // SECURITY: Absolute bounds check (reject obviously fake prices)
+        if (newPrice < 1000 || newPrice > 10000000) {
+          SecureLogger.warn('BTC price out of realistic range: \$$newPrice', tag: 'Price');
+          return;
+        }
+
+        _btcPriceUsd = newPrice;
         _lastFetch = DateTime.now();
         SecureLogger.info('BTC price updated: \$$_btcPriceUsd', tag: 'Price');
       }

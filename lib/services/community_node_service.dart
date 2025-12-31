@@ -49,9 +49,48 @@ class CommunityNodeService {
   }
 
   /// Set custom node URL (for advanced users)
+  /// SECURITY: Validates URL format, enforces HTTPS, blocks private networks
   Future<void> setNodeUrl(String url) async {
+    // SECURITY: Validate URL format
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      throw ArgumentError('Invalid URL format');
+    }
+
+    // SECURITY: Enforce HTTPS only (prevent protocol downgrade attacks)
+    if (uri.scheme != 'https') {
+      throw ArgumentError('Only HTTPS URLs allowed for security');
+    }
+
+    // SECURITY: Block localhost and private IP ranges (SSRF protection)
+    final host = uri.host.toLowerCase();
+    final blockedPatterns = [
+      'localhost',
+      '127.', '0.0.0.0',
+      '192.168.', '10.',
+      '172.16.', '172.17.', '172.18.', '172.19.',
+      '172.20.', '172.21.', '172.22.', '172.23.',
+      '172.24.', '172.25.', '172.26.', '172.27.',
+      '172.28.', '172.29.', '172.30.', '172.31.',
+      '169.254.', // Link-local
+      '::1', '[::1]', // IPv6 localhost
+      'fc00:', 'fd00:', // IPv6 private
+    ];
+
+    for (final pattern in blockedPatterns) {
+      if (host.contains(pattern) || host.startsWith(pattern)) {
+        throw ArgumentError('Private network URLs are blocked for security');
+      }
+    }
+
+    // SECURITY: Validate domain has valid TLD
+    if (!host.contains('.') || host.endsWith('.')) {
+      throw ArgumentError('Invalid domain name');
+    }
+
     await SecureStorageService.write(_communityNodeUrlKey, url);
     _nodeUrl = url;
+    SecureLogger.info('Community node URL updated', tag: 'Community');
   }
 
   /// Check community node status
