@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'The Future of Bitcoin Payments: What to Expect in 2025 and Beyond'
-description: 'Explore the future of Bitcoin payments with BOLT12 adoption, Lightning improvements, enhanced privacy, institutional integration, and emerging payment technologies.'
+title: "The Future of Bitcoin Payments: What to Expect in 2025 and Beyond"
+description: "Explore the future of Bitcoin payments with BOLT12 adoption, Lightning improvements, enhanced privacy, institutional integration, and emerging payment technologies."
 date: 2024-11-18
 author: 'Bolt21 Team'
 tags: ['future', 'bitcoin', 'lightning-network', 'technology']

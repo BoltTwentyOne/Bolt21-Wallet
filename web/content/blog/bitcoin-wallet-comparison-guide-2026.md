@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Bitcoin Wallet Comparison 2026: Choosing the Right Wallet for Your Needs'
-description: 'Compare Bitcoin wallets including hardware, mobile, desktop, and Lightning wallets. Find the perfect wallet for security, features, and usability in 2026.'
+title: "Bitcoin Wallet Comparison 2026: Choosing the Right Wallet for Your Needs"
+description: "Compare Bitcoin wallets including hardware, mobile, desktop, and Lightning wallets. Find the perfect wallet for security, features, and usability in 2026."
 date: 2026-04-28
 author: 'Bolt21 Team'
 tags: ['wallets', 'bitcoin', 'comparison', 'hardware-wallet', 'lightning-network']

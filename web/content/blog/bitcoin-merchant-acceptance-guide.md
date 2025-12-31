@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Accepting Bitcoin as a Merchant: Complete Integration Guide for 2026'
-description: 'Learn how to accept Bitcoin payments in your business with Lightning Network, payment processors, and point-of-sale systems. Complete merchant guide for 2026.'
+title: "Accepting Bitcoin as a Merchant: Complete Integration Guide for 2026"
+description: "Learn how to accept Bitcoin payments in your business with Lightning Network, payment processors, and point-of-sale systems. Complete merchant guide for 2026."
 date: 2026-05-05
 author: 'Bolt21 Team'
 tags: ['merchants', 'bitcoin', 'lightning-network', 'business', 'payments']

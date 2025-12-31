@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Lightning Channel Management: Mastering Liquidity and Routing in 2026'
-description: 'Learn Lightning Network channel management including liquidity balancing, channel capacity, routing optimization, and automated solutions for 2026.'
+title: "Lightning Channel Management: Mastering Liquidity and Routing in 2026"
+description: "Learn Lightning Network channel management including liquidity balancing, channel capacity, routing optimization, and automated solutions for 2026."
 date: 2026-04-07
 author: 'Bolt21 Team'
 tags: ['lightning-network', 'channels', 'liquidity', 'tutorial', 'advanced']

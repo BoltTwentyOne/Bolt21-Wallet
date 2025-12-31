@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Best Mobile Bitcoin Wallets 2024: Self-Custodial Options Compared'
-description: 'Compare the top mobile Bitcoin wallets for iOS and Android. Learn which self-custodial wallets support Lightning, BOLT12, and offer the best security and user experience.'
+title: "Best Mobile Bitcoin Wallets 2024: Self-Custodial Options Compared"
+description: "Compare the top mobile Bitcoin wallets for iOS and Android. Learn which self-custodial wallets support Lightning, BOLT12, and offer the best security and user experience."
 date: 2024-11-28
 author: 'Bolt21 Team'
 tags: ['wallets', 'mobile', 'bitcoin', 'reviews']

@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Bitcoin Mining Payouts on Lightning: Lower Fees, Faster Settlements in 2026'
-description: 'Discover how Lightning Network revolutionizes Bitcoin mining payouts with instant settlements, zero fees, and no minimums. Complete guide for miners.'
+title: "Bitcoin Mining Payouts on Lightning: Lower Fees, Faster Settlements in 2026"
+description: "Discover how Lightning Network revolutionizes Bitcoin mining payouts with instant settlements, zero fees, and no minimums. Complete guide for miners."
 date: 2026-03-31
 author: 'Bolt21 Team'
 tags: ['mining', 'lightning-network', 'bitcoin', 'payouts', 'bolt12']

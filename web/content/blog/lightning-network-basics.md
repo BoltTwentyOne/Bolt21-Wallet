@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Lightning Network Basics: Fast, Cheap Bitcoin Payments Explained'
-description: 'Learn how the Lightning Network enables instant, low-cost Bitcoin transactions. Understand payment channels, routing, and why Lightning is the future of Bitcoin payments.'
+title: "Lightning Network Basics: Fast, Cheap Bitcoin Payments Explained"
+description: "Learn how the Lightning Network enables instant, low-cost Bitcoin transactions. Understand payment channels, routing, and why Lightning is the future of Bitcoin payments."
 date: 2024-12-15
 author: 'Bolt21 Team'
 tags: ['lightning-network', 'bitcoin', 'payments', 'beginner']

@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Lightning vs On-Chain Bitcoin: Which Should You Use and When?'
-description: 'Compare Lightning Network and on-chain Bitcoin transactions. Learn when to use each, understand the trade-offs, fees, speed, and choose the right layer for your needs.'
+title: "Lightning vs On-Chain Bitcoin: Which Should You Use and When?"
+description: "Compare Lightning Network and on-chain Bitcoin transactions. Learn when to use each, understand the trade-offs, fees, speed, and choose the right layer for your needs."
 date: 2024-11-20
 author: 'Bolt21 Team'
 tags: ['lightning-network', 'bitcoin', 'comparison', 'payments']

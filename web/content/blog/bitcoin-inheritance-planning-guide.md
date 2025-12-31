@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Bitcoin Inheritance Planning: Securing Your Digital Assets for Future Generations'
-description: 'Complete guide to Bitcoin inheritance planning including multisig solutions, legal considerations, and ensuring loved ones can access your Bitcoin in 2026.'
+title: "Bitcoin Inheritance Planning: Securing Your Digital Assets for Future Generations"
+description: "Complete guide to Bitcoin inheritance planning including multisig solutions, legal considerations, and ensuring loved ones can access your Bitcoin in 2026."
 date: 2026-05-12
 author: 'Bolt21 Team'
 tags: ['inheritance', 'security', 'bitcoin', 'multisig', 'estate-planning']

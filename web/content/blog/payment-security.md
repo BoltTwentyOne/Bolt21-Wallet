@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'Bitcoin Payment Security: Best Practices to Protect Your Funds'
-description: 'Learn essential Bitcoin security practices. Protect your wallet, avoid scams, secure your recovery phrase, and safely send and receive Bitcoin payments.'
+title: "Bitcoin Payment Security: Best Practices to Protect Your Funds"
+description: "Learn essential Bitcoin security practices. Protect your wallet, avoid scams, secure your recovery phrase, and safely send and receive Bitcoin payments."
 date: 2024-11-25
 author: 'Bolt21 Team'
 tags: ['security', 'bitcoin', 'best-practices', 'safety']

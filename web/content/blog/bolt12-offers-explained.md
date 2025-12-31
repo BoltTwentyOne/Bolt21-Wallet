@@ -1,7 +1,7 @@
 ---
 css: ["blog.css"]
-title: 'BOLT12 Offers: Reusable Lightning Addresses That Never Expire'
-description: 'Learn about BOLT12 offers, the revolutionary Lightning Network payment standard that enables reusable payment addresses. Perfect for merchants, miners, and content creators.'
+title: "BOLT12 Offers: Reusable Lightning Addresses That Never Expire"
+description: "Learn about BOLT12 offers, the revolutionary Lightning Network payment standard that enables reusable payment addresses. Perfect for merchants, miners, and content creators."
 date: 2024-12-05
 author: 'Bolt21 Team'
 tags: ['bolt12', 'lightning-network', 'technology', 'payments']
