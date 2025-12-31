@@ -52,6 +52,9 @@ assets/config.json
 !.env.example
 secrets/
 
+# Private tools (not for public distribution)
+tools/
+
 # Security reports
 security-report.md
 pitch-deck/

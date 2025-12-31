@@ -101,6 +101,15 @@ If you only have some words:
 
 Your 12 words are the keys to your Bitcoin. Treat them like cash.
 
+### What NOT To Do
+
+- **NEVER say your seed words out loud** - Smart speakers (Alexa, Google Home, Siri), phones, TVs, and laptops have microphones that may be listening. Even if you think they're off.
+- **NEVER type them on an internet-connected device** - Keyloggers, clipboard malware, and browser extensions can steal them instantly
+- **NEVER take a photo or screenshot** - Cloud backups (iCloud, Google Photos) sync automatically without asking
+- **NEVER store in notes apps, email, or cloud storage** - These are not secure and can be hacked
+- **NEVER share with anyone** - No legitimate support will ever ask for your seed phrase. Bolt21 will NEVER ask.
+- **NEVER enter on any website** - Phishing sites look identical to real ones
+
 ### Storage Options
 
 | Method | Durability | Security | Cost |
