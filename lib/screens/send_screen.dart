@@ -62,10 +62,24 @@ class _SendScreenState extends State<SendScreen> {
     }
 
     // Parse amount if provided (for BOLT12 offers)
+    // SECURITY: Use BigInt.tryParse to prevent integer overflow on large values
     BigInt? amountSat;
     if (_amountController.text.isNotEmpty) {
-      final parsed = int.tryParse(_amountController.text.trim());
-      if (parsed == null || parsed <= 0 || parsed > 2100000000000000) {
+      final inputText = _amountController.text.trim();
+      // Reject non-numeric characters (prevents injection)
+      if (!RegExp(r'^\d+$').hasMatch(inputText)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid amount. Only numeric digits allowed.'),
+            backgroundColor: Bolt21Theme.error,
+          ),
+        );
+        return;
+      }
+      final parsed = BigInt.tryParse(inputText);
+      // Max sats: 21M BTC = 2,100,000,000,000,000 sats
+      const maxSats = 2100000000000000;
+      if (parsed == null || parsed <= BigInt.zero || parsed > BigInt.from(maxSats)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invalid amount. Must be between 1 and 21M BTC in sats.'),
@@ -74,7 +88,7 @@ class _SendScreenState extends State<SendScreen> {
         );
         return;
       }
-      amountSat = BigInt.from(parsed);
+      amountSat = parsed;
     }
 
     // SECURITY: Require biometric re-authentication for large payments
