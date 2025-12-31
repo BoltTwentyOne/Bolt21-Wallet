@@ -5,7 +5,7 @@ description: "Learn about Liquid Network, the Bitcoin sidechain enabling fast se
 date: 2024-12-02
 author: 'Bolt21 Team'
 tags: ['liquid-network', 'bitcoin', 'sidechains', 'technology']
-image: '/images/blog/liquid-network.png'
+image: '/images/blog/liquid-network-explained.png'
 ---
 
 # Liquid Network: Bitcoin Sidechains for Fast, Confidential Transactions

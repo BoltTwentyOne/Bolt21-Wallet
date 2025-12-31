@@ -5,7 +5,7 @@ description: "Explore the future of Bitcoin payments with BOLT12 adoption, Light
 date: 2024-11-18
 author: 'Bolt21 Team'
 tags: ['future', 'bitcoin', 'lightning-network', 'technology']
-image: '/images/blog/future-payments.png'
+image: '/images/blog/future-bitcoin-payments.png'
 ---
 
 # The Future of Bitcoin Payments: What to Expect in 2025 and Beyond

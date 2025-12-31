@@ -5,7 +5,7 @@ description: "Learn about BOLT12 offers, the revolutionary Lightning Network pay
 date: 2024-12-05
 author: 'Bolt21 Team'
 tags: ['bolt12', 'lightning-network', 'technology', 'payments']
-image: '/images/blog/bolt12-offers.png'
+image: '/images/blog/bolt12-offers-explained.png'
 ---
 
 # BOLT12 Offers: Reusable Lightning Addresses That Never Expire

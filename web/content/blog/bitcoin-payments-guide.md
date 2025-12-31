@@ -5,7 +5,7 @@ description: "Learn how to accept Bitcoin payments as a merchant. Compare paymen
 date: 2024-12-08
 author: 'Bolt21 Team'
 tags: ['payments', 'merchants', 'bitcoin', 'lightning-network']
-image: '/images/blog/bitcoin-payments.png'
+image: '/images/blog/bitcoin-payments-guide.png'
 ---
 
 # Bitcoin Payments for Merchants: Complete 2024 Guide

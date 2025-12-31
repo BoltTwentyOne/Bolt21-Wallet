@@ -5,7 +5,7 @@ description: "New to Bitcoin? Learn the basics of cryptocurrency, how Bitcoin wo
 date: 2024-11-22
 author: 'Bolt21 Team'
 tags: ['beginner', 'bitcoin', 'guide', 'education']
-image: '/images/blog/bitcoin-beginners.png'
+image: '/images/blog/bitcoin-for-beginners.png'
 ---
 
 # Bitcoin for Beginners: Complete Guide to Getting Started in 2024

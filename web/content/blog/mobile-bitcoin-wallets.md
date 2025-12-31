@@ -5,7 +5,7 @@ description: "Compare the top mobile Bitcoin wallets for iOS and Android. Learn 
 date: 2024-11-28
 author: 'Bolt21 Team'
 tags: ['wallets', 'mobile', 'bitcoin', 'reviews']
-image: '/images/blog/mobile-wallets.png'
+image: '/images/blog/mobile-bitcoin-wallets.png'
 ---
 
 # Best Mobile Bitcoin Wallets 2024: Self-Custodial Options Compared
