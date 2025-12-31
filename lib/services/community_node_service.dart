@@ -3,6 +3,17 @@ import 'package:http/http.dart' as http;
 import 'secure_storage_service.dart';
 import '../utils/secure_logger.dart';
 
+/// SECURITY: Safe integer parsing for community node responses
+int _safeParseInt(dynamic value, {int defaultValue = 0}) {
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is String) {
+    final parsed = int.tryParse(value);
+    return parsed ?? defaultValue;
+  }
+  return defaultValue;
+}
+
 /// Service for routing payments through the Bolt21 Community Node
 ///
 /// This allows users to route payments through a community-operated
@@ -103,10 +114,17 @@ class CommunityNodeService {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        _cachedStatus = CommunityNodeStatus.fromJson(json);
-        SecureLogger.info('Community node online: ${_cachedStatus?.alias}', tag: 'Community');
-        return _cachedStatus;
+        // SECURITY: Defensive JSON parsing
+        try {
+          final json = jsonDecode(response.body);
+          if (json is Map<String, dynamic>) {
+            _cachedStatus = CommunityNodeStatus.fromJson(json);
+            SecureLogger.info('Community node online: ${_cachedStatus?.alias}', tag: 'Community');
+            return _cachedStatus;
+          }
+        } on FormatException catch (e) {
+          SecureLogger.warn('Community node: Malformed status response', tag: 'Community');
+        }
       }
     } catch (e) {
       SecureLogger.warn('Community node offline: $e', tag: 'Community');
@@ -136,24 +154,37 @@ class CommunityNodeService {
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 65)); // LND timeout is 60s
 
-      final json = jsonDecode(response.body);
+      // SECURITY: Defensive JSON parsing
+      Map<String, dynamic> json;
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map<String, dynamic>) {
+          return CommunityPaymentResult(success: false, error: 'Invalid response format');
+        }
+        json = decoded;
+      } on FormatException {
+        return CommunityPaymentResult(success: false, error: 'Malformed response');
+      }
 
       if (response.statusCode == 200 && json['success'] == true) {
+        // SECURITY: Safe parsing for numeric fields
+        final feeSat = _safeParseInt(json['feeSat']);
+        final amountSat = _safeParseInt(json['amountSat']);
         SecureLogger.info(
-          'Payment via community node: ${json['amountSat']} sats (fee: ${json['feeSat']})',
+          'Payment via community node: $amountSat sats (fee: $feeSat)',
           tag: 'Community',
         );
         return CommunityPaymentResult(
           success: true,
-          paymentHash: json['paymentHash'],
-          feeSat: json['feeSat'] ?? 0,
-          amountSat: json['amountSat'] ?? 0,
+          paymentHash: json['paymentHash']?.toString(),
+          feeSat: feeSat,
+          amountSat: amountSat,
         );
       } else {
         SecureLogger.warn('Community node payment failed: ${json['error']}', tag: 'Community');
         return CommunityPaymentResult(
           success: false,
-          error: json['error'] ?? 'Unknown error',
+          error: json['error']?.toString() ?? 'Unknown error',
         );
       }
     } catch (e) {
@@ -180,8 +211,15 @@ class CommunityNodeService {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return json['invoice'];
+        // SECURITY: Defensive JSON parsing
+        try {
+          final json = jsonDecode(response.body);
+          if (json is Map<String, dynamic>) {
+            return json['invoice']?.toString();
+          }
+        } on FormatException {
+          SecureLogger.warn('Community node: Malformed invoice response', tag: 'Community');
+        }
       }
     } catch (e) {
       SecureLogger.warn('Community node invoice failed: $e', tag: 'Community');
@@ -210,13 +248,14 @@ class CommunityNodeStatus {
   });
 
   factory CommunityNodeStatus.fromJson(Map<String, dynamic> json) {
+    // SECURITY: Safe parsing for all numeric fields
     return CommunityNodeStatus(
-      online: json['online'] ?? false,
-      alias: json['alias'],
-      channels: json['channels'] ?? 0,
-      spendable: json['spendable'] ?? 0,
-      receivable: json['receivable'] ?? 0,
-      feeRatePpm: json['feeRatePpm'] ?? 0,
+      online: json['online'] == true,
+      alias: json['alias']?.toString(),
+      channels: _safeParseInt(json['channels']),
+      spendable: _safeParseInt(json['spendable']),
+      receivable: _safeParseInt(json['receivable']),
+      feeRatePpm: _safeParseInt(json['feeRatePpm']),
     );
   }
 }
