@@ -16,9 +16,15 @@ int _safeParseInt(dynamic value, {int defaultValue = 0}) {
 
 /// Service for routing payments through the Bolt21 Community Node
 ///
-/// This allows users to route payments through a community-operated
-/// Lightning node for potentially lower fees, with fallback to Breez.
+/// WARNING: This feature is DISABLED pending architectural redesign.
+/// The current implementation is custodial (pays from node owner's balance)
+/// rather than routing (earning fees on pass-through payments).
+///
+/// TODO: Either implement LNDHub for proper custodial accounts, or
+/// pivot to LSP model where users open channels directly.
 class CommunityNodeService {
+  // DISABLED: Feature disabled to prevent fund loss
+  static const bool _featureEnabled = false;
   static const _communityNodeUrlKey = 'bolt21_community_node_url';
   static const _communityNodeEnabledKey = 'bolt21_community_node_enabled';
 
@@ -31,7 +37,8 @@ class CommunityNodeService {
   bool _isEnabled = false;
   CommunityNodeStatus? _cachedStatus;
 
-  bool get isEnabled => _isEnabled;
+  // DISABLED: Always returns false until feature is redesigned
+  bool get isEnabled => _featureEnabled && _isEnabled;
   String? get nodeUrl => _nodeUrl;
   CommunityNodeStatus? get status => _cachedStatus;
 
@@ -46,7 +53,12 @@ class CommunityNodeService {
   }
 
   /// Enable community node routing
+  /// DISABLED: Feature disabled pending architectural redesign
   Future<void> enable() async {
+    if (!_featureEnabled) {
+      SecureLogger.warn('Community Node feature is disabled', tag: 'Community');
+      return;
+    }
     await SecureStorageService.write(_communityNodeEnabledKey, 'true');
     _isEnabled = true;
     await checkStatus();
