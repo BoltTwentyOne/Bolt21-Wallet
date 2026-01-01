@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.10.4
@@ -35,13 +35,22 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # Breez SDK Liquid for Lightning + BOLT12 support
-  # SECURITY: Pinned to specific commit to prevent supply chain attacks
-  # Update manually after reviewing changes: git ls-remote https://github.com/breez/breez-sdk-liquid-flutter refs/heads/main
+  # Breez SDK - Dual Backend Support
+  # Liquid: Wrapped BTC (L-BTC), has BOLT12 receive support
+  # Spark: Native BTC, lower fees, no BOLT12 receive yet
+  # SECURITY: Pin to specific commits to prevent supply chain attacks
+
+  # Liquid Backend (BOLT12 support)
   flutter_breez_liquid:
     git:
       url: https://github.com/breez/breez-sdk-liquid-flutter
       ref: d3e0bf44404bbadcd69be1aaf56a8389a83eb6e6  # Pinned 2025-12-29
+
+  # Spark Backend (Bitcoin-native, lower fees)
+  breez_sdk_spark_flutter:
+    git:
+      url: https://github.com/breez/breez-sdk-spark-flutter
+      ref: main  # TODO: Pin to specific commit after testing
 
   flutter_secure_storage: ^10.0.0
   qr_flutter: ^4.1.0

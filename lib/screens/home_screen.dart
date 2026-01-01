@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
 import 'package:provider/provider.dart';
 import '../providers/wallet_provider.dart';
 import '../services/app_update_service.dart';
+import '../services/backends/lightning_backend.dart';
 import '../services/operation_state_service.dart';
 import '../services/price_service.dart';
 import '../utils/formatters.dart';
@@ -447,7 +447,7 @@ class _BalanceChip extends StatelessWidget {
 }
 
 class _TransactionList extends StatelessWidget {
-  final List<Payment> payments;
+  final List<UnifiedPayment> payments;
 
   const _TransactionList({required this.payments});
 
@@ -483,16 +483,14 @@ class _TransactionList extends StatelessWidget {
         separatorBuilder: (context, index) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final payment = payments[index];
-          final isReceive = payment.paymentType == PaymentType.receive;
+          final isReceive = payment.direction == PaymentDirection.receive;
           final amount = payment.amountSat.toInt();
-          final timestamp = DateTime.fromMillisecondsSinceEpoch(
-            payment.timestamp * 1000,
-          );
+          final timestamp = payment.timestamp;
           final timeAgo = _formatTimeAgo(timestamp);
 
           // Determine icon and color based on payment type and status
-          final isPending = payment.status == PaymentState.pending;
-          final isFailed = payment.status == PaymentState.failed;
+          final isPending = payment.state == PaymentState.pending;
+          final isFailed = payment.state == PaymentState.failed;
 
           IconData icon;
           Color iconColor;
@@ -566,11 +564,11 @@ class _TransactionList extends StatelessWidget {
     );
   }
 
-  void _showPaymentDetails(BuildContext context, Payment payment) {
-    final isReceive = payment.paymentType == PaymentType.receive;
+  void _showPaymentDetails(BuildContext context, UnifiedPayment payment) {
+    final isReceive = payment.direction == PaymentDirection.receive;
     final amount = payment.amountSat.toInt();
     final feesSat = payment.feesSat.toInt();
-    final timestamp = DateTime.fromMillisecondsSinceEpoch(payment.timestamp * 1000);
+    final timestamp = payment.timestamp;
 
     // Format date
     final dateStr = '${timestamp.day}/${timestamp.month}/${timestamp.year}';
@@ -579,7 +577,7 @@ class _TransactionList extends StatelessWidget {
     // Status
     String statusStr;
     Color statusColor;
-    switch (payment.status) {
+    switch (payment.state) {
       case PaymentState.pending:
         statusStr = 'Pending';
         statusColor = Bolt21Theme.orange;
@@ -592,22 +590,22 @@ class _TransactionList extends StatelessWidget {
         statusStr = 'Failed';
         statusColor = Bolt21Theme.error;
         break;
-      default:
-        statusStr = 'Unknown';
-        statusColor = Bolt21Theme.textSecondary;
     }
 
     // Payment method
     String methodStr;
-    switch (payment.details) {
-      case PaymentDetails_Lightning():
+    switch (payment.methodType) {
+      case PaymentMethodType.lightning:
         methodStr = 'Lightning';
         break;
-      case PaymentDetails_Liquid():
-        methodStr = 'Liquid';
+      case PaymentMethodType.spark:
+        methodStr = 'Spark';
         break;
-      case PaymentDetails_Bitcoin():
+      case PaymentMethodType.onchain:
         methodStr = 'On-chain';
+        break;
+      case PaymentMethodType.liquid:
+        methodStr = 'Liquid';
         break;
     }
 

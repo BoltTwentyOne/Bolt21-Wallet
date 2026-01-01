@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
+import 'backends/lightning_backend.dart';
 import '../utils/secure_logger.dart';
 
 /// Service for handling payment notifications
@@ -10,7 +10,7 @@ class NotificationService {
   StreamSubscription? _subscription;
 
   /// Subscribe to SDK events for payment notifications
-  void subscribeToPayments(Stream<SdkEvent> eventStream) {
+  void subscribeToPayments(Stream<BackendEvent> eventStream) {
     _subscription?.cancel();
     _subscription = eventStream.listen((event) {
       _handleEvent(event);
@@ -18,16 +18,26 @@ class NotificationService {
     SecureLogger.info('Subscribed to payment notifications', tag: 'Notify');
   }
 
-  void _handleEvent(SdkEvent event) {
+  void _handleEvent(BackendEvent event) {
     // Handle payment-related events
-    if (event is SdkEvent_PaymentSucceeded) {
+    if (event is PaymentReceivedEvent) {
       SecureLogger.info(
-        'Payment succeeded: ${event.details.amountSat} sats',
+        'Payment received: ${event.payment.amountSat} sats',
         tag: 'Notify',
       );
-    } else if (event is SdkEvent_PaymentFailed) {
+    } else if (event is PaymentSentEvent) {
+      SecureLogger.info(
+        'Payment sent: ${event.payment.amountSat} sats',
+        tag: 'Notify',
+      );
+    } else if (event is PaymentFailedEvent) {
       SecureLogger.warn(
-        'Payment failed: ${event.details.amountSat} sats',
+        'Payment failed: ${event.payment.amountSat} sats',
+        tag: 'Notify',
+      );
+    } else if (event is SyncedEvent) {
+      SecureLogger.info(
+        'Wallet synced',
         tag: 'Notify',
       );
     }

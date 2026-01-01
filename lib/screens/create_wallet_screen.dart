@@ -4,6 +4,7 @@ import '../providers/wallet_provider.dart';
 import '../utils/theme.dart';
 import '../utils/secure_clipboard.dart';
 import '../utils/secure_string.dart';
+import '../services/backends/lightning_backend.dart';
 import 'home_screen.dart';
 
 class CreateWalletScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
   bool _showWords = false;
   final _nameController = TextEditingController();
   int _step = 0; // 0 = name, 1 = seed phrase
+  LightningBackendType _selectedBackend = LightningBackendType.liquid;
 
   @override
   void initState() {
@@ -87,7 +89,11 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
 
       // Use importWallet since we already have the mnemonic
       // SECURITY: Access mnemonic.value only when needed (minimizes String exposure)
-      await wallet.importWallet(name: name, mnemonic: _mnemonic!.value);
+      await wallet.importWallet(
+        name: name,
+        mnemonic: _mnemonic!.value,
+        backendType: _selectedBackend,
+      );
 
       // SECURITY: Securely wipe mnemonic from memory after successful storage
       if (mounted) {
@@ -141,11 +147,54 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
     return _buildSeedPhraseStep();
   }
 
+  Widget _buildBackendDescription() {
+    final bool isLiquid = _selectedBackend == LightningBackendType.liquid;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Bolt21Theme.darkCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Bolt21Theme.darkBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isLiquid ? Icons.check_circle : Icons.speed,
+                color: Bolt21Theme.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isLiquid ? 'BOLT12 Support' : 'Lower Fees',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isLiquid
+                ? 'Wrapped BTC (L-BTC) with support for BOLT12 offers and invoices'
+                : 'Native BTC with lower transaction fees',
+            style: const TextStyle(
+              color: Bolt21Theme.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNameStep() {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Wallet'),
-      ),
+      appBar: AppBar(title: const Text('Create Wallet')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -153,10 +202,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
           children: [
             const Text(
               'Name your wallet',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -175,6 +221,52 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
               maxLength: 30,
               textCapitalization: TextCapitalization.words,
             ),
+            const SizedBox(height: 32),
+            const Text(
+              'Backend Type',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<LightningBackendType>(
+              segments: const [
+                ButtonSegment(
+                  value: LightningBackendType.liquid,
+                  label: Text('Liquid'),
+                  icon: Icon(Icons.water_drop),
+                ),
+                ButtonSegment(
+                  value: LightningBackendType.spark,
+                  label: Text('Spark'),
+                  icon: Icon(Icons.bolt),
+                ),
+              ],
+              selected: {_selectedBackend},
+              onSelectionChanged: (Set<LightningBackendType> newSelection) {
+                setState(() {
+                  _selectedBackend = newSelection.first;
+                });
+              },
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith<Color>((
+                  Set<WidgetState> states,
+                ) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Bolt21Theme.orange;
+                  }
+                  return Bolt21Theme.darkCard;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith<Color>((
+                  Set<WidgetState> states,
+                ) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.black;
+                  }
+                  return Bolt21Theme.textPrimary;
+                }),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildBackendDescription(),
             const Spacer(),
             SizedBox(
               width: double.infinity,
@@ -269,11 +361,11 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 2.5,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
+                                crossAxisCount: 3,
+                                childAspectRatio: 2.5,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                              ),
                           itemCount: words.length,
                           itemBuilder: (context, index) {
                             return Container(
@@ -318,7 +410,9 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
                             );
                           },
                           icon: const Icon(Icons.copy, size: 18),
-                          label: const Text('Copy to Clipboard (30s auto-clear)'),
+                          label: const Text(
+                            'Copy to Clipboard (30s auto-clear)',
+                          ),
                         ),
                       ],
                     ),
@@ -332,9 +426,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
                   onChanged: (value) {
                     setState(() => _backedUp = value ?? false);
                   },
-                  title: const Text(
-                    'I have written down my recovery phrase',
-                  ),
+                  title: const Text('I have written down my recovery phrase'),
                   subtitle: const Text(
                     'I understand that losing it means losing access to my funds',
                     style: TextStyle(

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
 import 'package:synchronized/synchronized.dart';
 import '../models/wallet_metadata.dart';
+import '../services/backends/lightning_backend.dart';
 import '../services/community_node_service.dart';
 import '../services/lightning_service.dart';
 import '../services/lnd_service.dart';
@@ -44,8 +44,8 @@ class WalletProvider extends ChangeNotifier {
   String? _error;
   String? _onChainAddress;
   String? _bolt12Offer;
-  GetInfoResponse? _info;
-  List<Payment> _payments = [];
+  UnifiedWalletInfo? _info;
+  List<UnifiedPayment> _payments = [];
   List<OperationState> _incompleteOperations = [];
 
   // LND node connection state (hybrid mode)
@@ -64,8 +64,8 @@ class WalletProvider extends ChangeNotifier {
   String? get error => _error;
   String? get onChainAddress => _onChainAddress;
   String? get bolt12Offer => _bolt12Offer;
-  GetInfoResponse? get info => _info;
-  List<Payment> get payments => _payments;
+  UnifiedWalletInfo? get info => _info;
+  List<UnifiedPayment> get payments => _payments;
   LightningService get lightningService => _lightningService;
   LndService get lndService => _lndService;
   List<OperationState> get incompleteOperations => _incompleteOperations;
@@ -84,19 +84,20 @@ class WalletProvider extends ChangeNotifier {
 
   // Derived getters
   int get totalBalanceSats {
-    return _info?.walletInfo.balanceSat.toInt() ?? 0;
+    return _info?.balanceSat.toInt() ?? 0;
   }
 
   int get pendingReceiveSats {
-    return _info?.walletInfo.pendingReceiveSat.toInt() ?? 0;
+    return _info?.pendingReceiveSat.toInt() ?? 0;
   }
 
   int get pendingSendSats {
-    return _info?.walletInfo.pendingSendSat.toInt() ?? 0;
+    return _info?.pendingSendSat.toInt() ?? 0;
   }
 
   String? get nodeId {
-    return _info?.walletInfo.pubkey;
+    // Node ID not available in UnifiedWalletInfo
+    return null;
   }
 
   /// Load wallet list and initialize active wallet
@@ -109,7 +110,10 @@ class WalletProvider extends ChangeNotifier {
       // Check for and perform migration from single-wallet to multi-wallet
       final migratedWallet = await SecureStorageService.migrateLegacyWallet();
       if (migratedWallet != null) {
-        SecureLogger.info('Migrated legacy wallet to multi-wallet format', tag: 'Wallet');
+        SecureLogger.info(
+          'Migrated legacy wallet to multi-wallet format',
+          tag: 'Wallet',
+        );
       }
 
       // Load wallet list
@@ -157,10 +161,11 @@ class WalletProvider extends ChangeNotifier {
       }
 
       try {
-        // Initialize Lightning service with wallet-specific directory
+        // Initialize Lightning service with wallet-specific directory and backend
         await _lightningService.initialize(
           walletId: _activeWallet!.id,
           mnemonic: secureMnemonic.value,
+          backendType: _activeWallet!.backendType,
         );
       } finally {
         // SECURITY: Wipe mnemonic from memory after SDK has consumed it
@@ -172,7 +177,7 @@ class WalletProvider extends ChangeNotifier {
 
       // Subscribe to payment events for notifications
       NotificationService.instance.subscribeToPayments(
-        _lightningService.paymentEvents,
+        _lightningService.events,
       );
 
       // Restore previously generated addresses for this wallet
@@ -186,9 +191,6 @@ class WalletProvider extends ChangeNotifier {
       // Check for incomplete operations
       await _checkIncompleteOperations();
 
-      // Auto-recover stuck swaps (runs in background)
-      _autoRecoverStuckSwaps();
-
       // Check for LND node connection (hybrid mode)
       await _checkLndConnection();
 
@@ -196,7 +198,11 @@ class WalletProvider extends ChangeNotifier {
       await _communityNodeService.initialize();
     } catch (e) {
       _error = e.toString();
-      SecureLogger.error('Wallet initialization error', error: e, tag: 'Wallet');
+      SecureLogger.error(
+        'Wallet initialization error',
+        error: e,
+        tag: 'Wallet',
+      );
       rethrow;
     }
   }
@@ -221,7 +227,10 @@ class WalletProvider extends ChangeNotifier {
         _lndNodeInfo = await _lndService.connect();
         _lndBalance = await _lndService.getBalance();
         _lndConnected = true;
-        SecureLogger.info('LND hybrid mode active: ${_lndNodeInfo?.alias}', tag: 'LND');
+        SecureLogger.info(
+          'LND hybrid mode active: ${_lndNodeInfo?.alias}',
+          tag: 'LND',
+        );
       }
     } catch (e) {
       // LND connection is optional - don't fail wallet init
@@ -246,12 +255,17 @@ class WalletProvider extends ChangeNotifier {
     final lower = destination.toLowerCase().trim();
     // Only route BOLT11 invoices via LND
     // BOLT12 offers need Breez SDK's support
-    return lower.startsWith('lnbc') || lower.startsWith('lntb') || lower.startsWith('lntbs');
+    return lower.startsWith('lnbc') ||
+        lower.startsWith('lntb') ||
+        lower.startsWith('lntbs');
   }
 
   /// Send payment via user's LND node (for BOLT11 invoices)
   /// Returns operation ID on success, null on failure
-  Future<String?> sendPaymentViaLnd(String paymentRequest, {int? amountSat}) async {
+  Future<String?> sendPaymentViaLnd(
+    String paymentRequest, {
+    int? amountSat,
+  }) async {
     if (!_lndConnected) {
       _error = 'LND node not connected';
       notifyListeners();
@@ -283,7 +297,8 @@ class WalletProvider extends ChangeNotifier {
 
       // Decode invoice to check amount
       final decoded = await _lndService.decodeInvoice(paymentRequest);
-      final sendAmountSat = amountSat ?? (decoded.amountSat > 0 ? decoded.amountSat : null);
+      final sendAmountSat =
+          amountSat ?? (decoded.amountSat > 0 ? decoded.amountSat : null);
 
       // Validate we have an amount for zero-amount invoices
       if (sendAmountSat == null || sendAmountSat <= 0) {
@@ -291,7 +306,8 @@ class WalletProvider extends ChangeNotifier {
       }
 
       // Check LND spendable balance
-      if (_lndBalance != null && sendAmountSat > _lndBalance!.spendableBalance) {
+      if (_lndBalance != null &&
+          sendAmountSat > _lndBalance!.spendableBalance) {
         throw Exception(
           'Insufficient LND channel balance. Available: ${_lndBalance!.spendableBalance} sats',
         );
@@ -344,7 +360,10 @@ class WalletProvider extends ChangeNotifier {
 
   /// Send payment via Community Node (for all BOLT11 invoices)
   /// Returns operation ID on success, null on failure (triggers fallback)
-  Future<String?> sendPaymentViaCommunityNode(String paymentRequest, {int? amountSat}) async {
+  Future<String?> sendPaymentViaCommunityNode(
+    String paymentRequest, {
+    int? amountSat,
+  }) async {
     if (!_communityNodeService.isEnabled) return null;
 
     final result = await _communityNodeService.payInvoice(
@@ -364,7 +383,8 @@ class WalletProvider extends ChangeNotifier {
       );
       // Refresh balance
       await _refreshAll();
-      return result.paymentHash ?? 'community_${DateTime.now().millisecondsSinceEpoch}';
+      return result.paymentHash ??
+          'community_${DateTime.now().millisecondsSinceEpoch}';
     }
 
     // Payment failed but node responded - don't fallback, show error
@@ -373,60 +393,12 @@ class WalletProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Automatically recover stuck swaps that have been pending too long
-  /// Runs in background - doesn't block initialization
-  Future<void> _autoRecoverStuckSwaps() async {
-    try {
-      final refundables = await _lightningService.listRefundables();
-      if (refundables.isEmpty) return;
-
-      SecureLogger.info(
-        'Found ${refundables.length} refundable swap(s), attempting auto-recovery',
-        tag: 'Wallet',
-      );
-
-      for (final swap in refundables) {
-        try {
-          // Get a refund address
-          final refundAddress = await _lightningService.getOnChainAddress();
-
-          // Get recommended fees (use economy for auto-refunds)
-          final fees = await _lightningService.getRecommendedFees();
-
-          // Process refund
-          await _lightningService.refundSwap(
-            swapAddress: swap.swapAddress,
-            refundAddress: refundAddress,
-            feeRateSatPerVbyte: fees.hourFee.toInt(), // Use slower fee for auto
-          );
-
-          SecureLogger.info(
-            'Auto-refund initiated for ${swap.amountSat} sats',
-            tag: 'Wallet',
-          );
-
-          // Show notification
-          NotificationService.instance;
-        } catch (e) {
-          SecureLogger.error(
-            'Auto-refund failed for swap ${swap.swapAddress}',
-            error: e,
-            tag: 'Wallet',
-          );
-        }
-      }
-
-      // Refresh to show updated balance
-      await _refreshAll();
-    } catch (e) {
-      // Don't fail silently but don't crash either
-      SecureLogger.error('Auto-recovery check failed', error: e, tag: 'Wallet');
-    }
-  }
-
   /// Create a new wallet with generated mnemonic
   /// SECURITY: Sanitizes wallet name to prevent injection attacks
-  Future<WalletMetadata> createWallet({required String name}) async {
+  Future<WalletMetadata> createWallet({
+    required String name,
+    LightningBackendType backendType = LightningBackendType.liquid,
+  }) async {
     _setLoading(true);
     _error = null;
 
@@ -440,8 +412,11 @@ class WalletProvider extends ChangeNotifier {
       // Generate new mnemonic
       final mnemonic = _lightningService.generateMnemonic();
 
-      // Create wallet metadata
-      final wallet = WalletMetadata.create(name: sanitizedName);
+      // Create wallet metadata with backend type
+      final wallet = WalletMetadata.create(
+        name: sanitizedName,
+        backendType: backendType,
+      );
 
       // Save mnemonic
       await SecureStorageService.saveMnemonic(mnemonic, walletId: wallet.id);
@@ -469,6 +444,7 @@ class WalletProvider extends ChangeNotifier {
   Future<WalletMetadata> importWallet({
     required String name,
     required String mnemonic,
+    LightningBackendType backendType = LightningBackendType.liquid,
   }) async {
     _setLoading(true);
     _error = null;
@@ -481,7 +457,10 @@ class WalletProvider extends ChangeNotifier {
       }
 
       // Create wallet metadata
-      final wallet = WalletMetadata.create(name: sanitizedName);
+      final wallet = WalletMetadata.create(
+        name: sanitizedName,
+        backendType: backendType,
+      );
 
       // Save mnemonic
       await SecureStorageService.saveMnemonic(mnemonic, walletId: wallet.id);
@@ -660,7 +639,10 @@ class WalletProvider extends ChangeNotifier {
     );
 
     if (_incompleteOperations.isNotEmpty) {
-      SecureLogger.info('Found ${_incompleteOperations.length} incomplete operations', tag: 'Wallet');
+      SecureLogger.info(
+        'Found ${_incompleteOperations.length} incomplete operations',
+        tag: 'Wallet',
+      );
 
       // For operations that were in "executing" state, mark as unknown
       // since we don't know if they completed
@@ -702,17 +684,14 @@ class WalletProvider extends ChangeNotifier {
     _setLoading(true);
     await _refreshAll();
     _setLoading(false);
-
-    // Check for stuck swaps on every refresh
-    _autoRecoverStuckSwaps();
   }
 
   Future<void> _refreshAll() async {
     try {
       // Use retry for network resilience
       _info = await withRefreshRetry(
-        operation: () => _lightningService.getInfo(),
-        operationName: 'getInfo',
+        operation: () => _lightningService.getWalletInfo(),
+        operationName: 'getWalletInfo',
       );
       _payments = await withRefreshRetry(
         operation: () => _lightningService.listPayments(),
@@ -824,7 +803,9 @@ class WalletProvider extends ChangeNotifier {
       final cutoffMs = nowMs - oneMinuteMs;
 
       // Remove attempts older than 1 minute (monotonic)
-      _paymentAttemptTimestamps.removeWhere((timestamp) => timestamp < cutoffMs);
+      _paymentAttemptTimestamps.removeWhere(
+        (timestamp) => timestamp < cutoffMs,
+      );
 
       // Check if rate limited
       if (_paymentAttemptTimestamps.length >= _maxPaymentAttemptsPerMinute) {
@@ -856,7 +837,8 @@ class WalletProvider extends ChangeNotifier {
     // Check and record in single locked operation to prevent bypass
     final isRateLimited = await _checkAndRecordPaymentAttempt();
     if (isRateLimited) {
-      _error = 'Too many payment attempts. Please wait a moment before trying again.';
+      _error =
+          'Too many payment attempts. Please wait a moment before trying again.';
       SecureLogger.warn('Payment rate limited', tag: 'Payment');
       notifyListeners();
       return null;
@@ -869,7 +851,8 @@ class WalletProvider extends ChangeNotifier {
       final balance = totalBalanceSats;
       final available = balance > feeBufferSats ? balance - feeBufferSats : 0;
       if (amountSat.toInt() > available) {
-        _error = 'Insufficient balance. Available: $available sats ($feeBufferSats sats reserved for fees)';
+        _error =
+            'Insufficient balance. Available: $available sats ($feeBufferSats sats reserved for fees)';
         notifyListeners();
         return null;
       }
@@ -905,10 +888,15 @@ class WalletProvider extends ChangeNotifier {
         amountSat: amountSat,
       );
 
+      // Check if payment was successful
+      if (!response.success) {
+        throw Exception(response.error ?? 'Payment failed');
+      }
+
       // Mark as completed with transaction ID
       await _operationStateService.markCompleted(
         operation.id,
-        txId: response.payment.txId,
+        txId: response.paymentId,
       );
 
       await _refreshAll();
@@ -937,14 +925,20 @@ class WalletProvider extends ChangeNotifier {
     final validationError = AddressValidator.validateDestination(destination);
     if (validationError != null) {
       _error = 'Invalid destination: $validationError';
-      SecureLogger.warn('Invalid payment destination blocked (idempotent)', tag: 'Payment');
+      SecureLogger.warn(
+        'Invalid payment destination blocked (idempotent)',
+        tag: 'Payment',
+      );
       notifyListeners();
       return null;
     }
 
     // Check if lock is already held (non-blocking check for UX)
     if (_sendLock.locked) {
-      SecureLogger.warn('Payment blocked - another payment in progress', tag: 'Wallet');
+      SecureLogger.warn(
+        'Payment blocked - another payment in progress',
+        tag: 'Wallet',
+      );
       _error = 'Another payment is in progress. Please wait.';
       notifyListeners();
       return null;
@@ -963,14 +957,19 @@ class WalletProvider extends ChangeNotifier {
         return null;
       }
 
-      final existing = _operationStateService.getAllOperations().where((op) =>
-          op.walletId == activeWalletId &&
-          op.destination == destination &&
-          op.amountSat == amountSat?.toInt() &&
-          op.isIncomplete);
+      final existing = _operationStateService.getAllOperations().where(
+        (op) =>
+            op.walletId == activeWalletId &&
+            op.destination == destination &&
+            op.amountSat == amountSat?.toInt() &&
+            op.isIncomplete,
+      );
 
       if (existing.isNotEmpty) {
-        SecureLogger.warn('Duplicate payment blocked for wallet $activeWalletId', tag: 'Wallet');
+        SecureLogger.warn(
+          'Duplicate payment blocked for wallet $activeWalletId',
+          tag: 'Wallet',
+        );
         _error = 'A payment to this destination is already in progress';
         notifyListeners();
         return null;

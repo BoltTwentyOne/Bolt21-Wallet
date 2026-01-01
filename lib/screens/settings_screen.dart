@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/wallet_provider.dart';
@@ -158,16 +157,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showChannels(context),
           ),
           _SettingsTile(
-            icon: Icons.water_drop,
-            title: 'Liquidity (LSP)',
-            subtitle: 'Configure Lightning Service Provider',
-            onTap: () => _showLspConfig(context),
-          ),
-          _SettingsTile(
-            icon: Icons.refresh,
-            title: 'Recover Stuck Funds',
-            subtitle: 'Reclaim funds from failed swaps',
-            onTap: () => _showRefundables(context),
+            icon: Icons.bolt,
+            title: 'Spark Network',
+            subtitle: 'Bitcoin-native Layer 2 info',
+            onTap: () => _showSparkInfo(context),
           ),
           const Divider(),
 
@@ -223,16 +216,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showLspConfig(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Bolt21Theme.darkCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const _LspConfigSheet(),
-    );
-  }
 
   void _showAbout(BuildContext context) {
     showAboutDialog(
@@ -305,54 +288,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showRefundables(BuildContext context) async {
-    final wallet = context.read<WalletProvider>();
-
-    // Show loading
-    showDialog(
+  void _showSparkInfo(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      backgroundColor: Bolt21Theme.darkCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const _SparkInfoSheet(),
     );
-
-    try {
-      final refundables = await wallet.lightningService.listRefundables();
-      if (!context.mounted) return;
-      Navigator.pop(context); // Close loading
-
-      if (refundables.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No stuck funds to recover'),
-            backgroundColor: Bolt21Theme.success,
-          ),
-        );
-        return;
-      }
-
-      // Show refundables
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Bolt21Theme.darkCard,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (ctx) => _RefundablesSheet(
-          refundables: refundables,
-          wallet: wallet,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error checking refundables: $e'),
-          backgroundColor: Bolt21Theme.error,
-        ),
-      );
-    }
   }
 
   void _confirmReset(BuildContext context) {
@@ -730,85 +675,172 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Sheet for LSP configuration
-class _LspConfigSheet extends StatelessWidget {
-  const _LspConfigSheet();
+/// Sheet to explain Spark network benefits
+class _SparkInfoSheet extends StatelessWidget {
+  const _SparkInfoSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) {
+        return ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Bolt21Theme.textSecondary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Row(
+              children: [
+                Icon(Icons.bolt, color: Bolt21Theme.orange, size: 28),
+                SizedBox(width: 12),
+                Text(
+                  'Spark Network',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bitcoin-native Layer 2 for Lightning payments',
+              style: TextStyle(color: Bolt21Theme.textSecondary),
+            ),
+            const SizedBox(height: 24),
+
+            // Benefits
+            const Text(
+              'Why Spark?',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _SparkBenefitItem(
+              icon: Icons.account_balance,
+              title: 'Real Bitcoin',
+              description: 'Your funds are actual BTC on the Bitcoin blockchain, not synthetic assets or wrapped tokens.',
+            ),
+            _SparkBenefitItem(
+              icon: Icons.savings,
+              title: 'Lower Fees',
+              description: 'No swap fees or conversion costs. Pay only Lightning routing fees.',
+            ),
+            _SparkBenefitItem(
+              icon: Icons.flash_on,
+              title: 'No Swaps Required',
+              description: 'Direct Lightning routing without intermediary token conversions.',
+            ),
+            _SparkBenefitItem(
+              icon: Icons.security,
+              title: 'Self-Custodial',
+              description: 'You control your keys and funds. No third-party custody.',
+            ),
+            const SizedBox(height: 24),
+
+            // Technical info
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Bolt21Theme.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Bolt21Theme.orange.withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Bolt21Theme.orange, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Built on Breez SDK',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Bolt21Theme.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Bolt21 uses the Breez SDK Spark implementation for seamless Bitcoin-native Lightning payments with full self-custody.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SparkBenefitItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+
+  const _SparkBenefitItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Bolt21Theme.textSecondary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Lightning Service Provider',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'LSPs provide automatic channel liquidity so you can receive payments without manually opening channels.',
-            style: TextStyle(color: Bolt21Theme.textSecondary),
-          ),
-          const SizedBox(height: 24),
-
-          // Info card
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Bolt21Theme.orange.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Bolt21Theme.orange.withValues(alpha: 0.3),
-              ),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Column(
+            child: Icon(icon, color: Bolt21Theme.orange, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Bolt21Theme.orange, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Coming Soon',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Bolt21Theme.orange,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
                 Text(
-                  'LSP configuration UI is in development. For now, LSP can be configured in code via LspConfig.',
-                  style: TextStyle(fontSize: 13),
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Bolt21Theme.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Recommended LSPs
-          const Text(
-            'Recommended LSPs:',
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          const Text('• Voltage Flow (voltage.cloud)'),
-          const Text('• Megalith (megalithic.me)'),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -1194,170 +1226,6 @@ class ChannelsScreen extends StatelessWidget {
   }
 }
 
-/// Sheet to display and recover stuck funds
-class _RefundablesSheet extends StatefulWidget {
-  final List<RefundableSwap> refundables;
-  final WalletProvider wallet;
-
-  const _RefundablesSheet({
-    required this.refundables,
-    required this.wallet,
-  });
-
-  @override
-  State<_RefundablesSheet> createState() => _RefundablesSheetState();
-}
-
-class _RefundablesSheetState extends State<_RefundablesSheet> {
-  bool _isProcessing = false;
-
-  Future<void> _refundSwap(RefundableSwap swap) async {
-    setState(() => _isProcessing = true);
-
-    try {
-      // Get an on-chain address to refund to
-      final refundAddress = await widget.wallet.lightningService.getOnChainAddress();
-
-      // Get recommended fees
-      final fees = await widget.wallet.lightningService.getRecommendedFees();
-
-      // Process refund
-      await widget.wallet.lightningService.refundSwap(
-        swapAddress: swap.swapAddress,
-        refundAddress: refundAddress,
-        feeRateSatPerVbyte: fees.fastestFee.toInt(),
-      );
-
-      if (!mounted) return;
-
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Refund initiated for ${swap.amountSat} sats'),
-          backgroundColor: Bolt21Theme.success,
-        ),
-      );
-
-      // Refresh wallet
-      await widget.wallet.refreshAll();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Refund failed: $e'),
-          backgroundColor: Bolt21Theme.error,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Bolt21Theme.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Stuck Funds',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${widget.refundables.length} swap(s) can be recovered',
-            style: const TextStyle(color: Bolt21Theme.textSecondary),
-          ),
-          const SizedBox(height: 24),
-
-          // List refundables
-          ...widget.refundables.map((swap) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Bolt21Theme.darkBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Bolt21Theme.orange.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${swap.amountSat} sats',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Bolt21Theme.orange,
-                      ),
-                    ),
-                    if (_isProcessing)
-                      const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      ElevatedButton(
-                        onPressed: () => _refundSwap(swap),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Bolt21Theme.orange,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                        ),
-                        child: const Text('Recover'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Address: ${swap.swapAddress.substring(0, 16)}...',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Bolt21Theme.textSecondary,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            ),
-          )),
-
-          const SizedBox(height: 16),
-          const Text(
-            'Tap "Recover" to return these funds to your wallet. '
-            'This may take a few minutes to confirm on-chain.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Bolt21Theme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
 
 /// Screen to connect to user's LND node
 class ConnectNodeScreen extends StatefulWidget {

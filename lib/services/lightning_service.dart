@@ -1,32 +1,50 @@
 import 'dart:io';
 import 'package:bip39/bip39.dart' as bip39;
-import 'package:flutter_breez_liquid/flutter_breez_liquid.dart';
 import 'package:path_provider/path_provider.dart';
+import 'backends/lightning_backend.dart';
+import 'backends/liquid_backend.dart';
+import 'backends/spark_backend.dart';
 import 'config_service.dart';
 import '../utils/secure_logger.dart';
 
-/// Service for managing Lightning node operations via Breez SDK Liquid
+/// Service for managing Lightning operations across multiple backends
+///
+/// Bolt21 supports multiple Lightning backends:
+/// - Liquid: Wrapped BTC (L-BTC), full BOLT12 support
+/// - Spark: Native BTC, lower fees, no BOLT12 receive yet
+///
+/// Each wallet chooses its backend at creation time and can switch later.
 class LightningService {
-  BreezSdkLiquid? _sdk;
-  bool _isInitialized = false;
+  LightningBackend? _backend;
   String? _currentWalletId;
+  LightningBackendType? _currentBackendType;
 
-  bool get isInitialized => _isInitialized;
-  BreezSdkLiquid? get sdk => _sdk;
+  bool get isInitialized => _backend?.isConnected ?? false;
   String? get currentWalletId => _currentWalletId;
+  LightningBackendType? get currentBackendType => _currentBackendType;
 
-  /// Initialize the Breez SDK for a specific wallet
+  /// Whether the current backend supports BOLT12 receive
+  bool get supportsBolt12Receive => _backend?.supportsBolt12Receive ?? false;
+
+  /// Initialize the service with a specific backend
   /// [walletId] - Unique wallet identifier for isolated data directory
   /// [mnemonic] - Seed phrase (required for new wallets)
+  /// [backendType] - Which backend implementation to use
   Future<void> initialize({
     required String walletId,
     required String mnemonic,
+    required LightningBackendType backendType,
   }) async {
-    // If already initialized with same wallet, skip
-    if (_isInitialized && _currentWalletId == walletId) return;
+    // If already initialized with same wallet and backend, skip
+    if (isInitialized &&
+        _currentWalletId == walletId &&
+        _currentBackendType == backendType) {
+      return;
+    }
 
-    // If switching wallets, disconnect first
-    if (_isInitialized && _currentWalletId != walletId) {
+    // If switching wallets or backends, disconnect first
+    if (isInitialized &&
+        (_currentWalletId != walletId || _currentBackendType != backendType)) {
       await disconnect();
     }
 
@@ -34,55 +52,41 @@ class LightningService {
       // Ensure config is loaded
       await ConfigService.instance.initialize();
 
-      SecureLogger.info('Initializing SDK for wallet $walletId...', tag: 'Breez');
+      SecureLogger.info(
+        'Initializing ${_backendTypeToString(backendType)} backend for wallet $walletId...',
+        tag: 'LightningService',
+      );
+
+      // Create the appropriate backend instance
+      _backend = _createBackend(backendType);
+      _currentBackendType = backendType;
+
+      // Get working directory for this wallet and backend
       final directory = await getApplicationDocumentsDirectory();
-      // Per-wallet directory for data isolation
-      final workingDir = '${directory.path}/wallet_$walletId';
+      final backendName = _backendTypeToString(backendType).toLowerCase();
+      final workingDir = '${directory.path}/${backendName}_wallet_$walletId';
 
-      // Ensure directory exists
-      await Directory(workingDir).create(recursive: true);
-
-      final seedPhrase = mnemonic;
-
-      SecureLogger.info('Creating config...', tag: 'Breez');
-      // Get default config and update the working directory
-      final defaultCfg = defaultConfig(
-        network: LiquidNetwork.mainnet,
-        breezApiKey: ConfigService.instance.breezApiKey,
-      );
-
-      final config = Config(
-        liquidExplorer: defaultCfg.liquidExplorer,
-        bitcoinExplorer: defaultCfg.bitcoinExplorer,
+      // Initialize the backend
+      await _backend!.initialize(
+        walletId: walletId,
+        mnemonic: mnemonic,
+        apiKey: ConfigService.instance.breezApiKey,
         workingDir: workingDir,
-        network: defaultCfg.network,
-        paymentTimeoutSec: defaultCfg.paymentTimeoutSec,
-        syncServiceUrl: defaultCfg.syncServiceUrl,
-        zeroConfMaxAmountSat: defaultCfg.zeroConfMaxAmountSat,
-        breezApiKey: defaultCfg.breezApiKey,
-        externalInputParsers: defaultCfg.externalInputParsers,
-        useDefaultExternalInputParsers: defaultCfg.useDefaultExternalInputParsers,
-        onchainFeeRateLeewaySat: defaultCfg.onchainFeeRateLeewaySat,
-        assetMetadata: defaultCfg.assetMetadata,
-        sideswapApiKey: defaultCfg.sideswapApiKey,
-        useMagicRoutingHints: defaultCfg.useMagicRoutingHints,
-        onchainSyncPeriodSec: defaultCfg.onchainSyncPeriodSec,
-        onchainSyncRequestTimeoutSec: defaultCfg.onchainSyncRequestTimeoutSec,
       );
 
-      SecureLogger.info('Connecting...', tag: 'Breez');
-      final connectRequest = ConnectRequest(
-        mnemonic: seedPhrase,
-        config: config,
-      );
-
-      _sdk = await connect(req: connectRequest);
-      _isInitialized = true;
       _currentWalletId = walletId;
 
-      SecureLogger.info('SDK initialized successfully for wallet $walletId', tag: 'Breez');
+      SecureLogger.info(
+        '${_backendTypeToString(backendType)} backend initialized for wallet $walletId',
+        tag: 'LightningService',
+      );
     } catch (e, stack) {
-      SecureLogger.error('Failed to initialize SDK', error: e, stackTrace: stack, tag: 'Breez');
+      SecureLogger.error(
+        'Failed to initialize Lightning service',
+        error: e,
+        stackTrace: stack,
+        tag: 'LightningService',
+      );
       rethrow;
     }
   }
@@ -93,131 +97,79 @@ class LightningService {
   }
 
   /// Get wallet info including balance
-  Future<GetInfoResponse> getInfo() async {
+  Future<UnifiedWalletInfo> getWalletInfo() async {
     _ensureInitialized();
-    return await _sdk!.getInfo();
+    return await _backend!.getWalletInfo();
   }
 
-  /// Get wallet balance in sats
-  Future<BigInt> getBalanceSat() async {
-    final info = await getInfo();
-    return info.walletInfo.balanceSat;
-  }
-
-  /// Generate a BOLT12 offer (reusable payment address)
-  Future<String> generateBolt12Offer() async {
-    _ensureInitialized();
-
-    final prepareRequest = PrepareReceiveRequest(
-      paymentMethod: PaymentMethod.bolt12Offer,
-    );
-
-    final prepareResponse = await _sdk!.prepareReceivePayment(
-      req: prepareRequest,
-    );
-
-    final receiveRequest = ReceivePaymentRequest(
-      prepareResponse: prepareResponse,
-    );
-
-    final response = await _sdk!.receivePayment(req: receiveRequest);
-    return response.destination;
-  }
-
-  /// Generate a BOLT11 invoice
+  /// Generate a BOLT11 invoice for receiving
   Future<String> generateBolt11Invoice({
     required BigInt amountSat,
     String? description,
   }) async {
     _ensureInitialized();
-
-    final prepareRequest = PrepareReceiveRequest(
-      paymentMethod: PaymentMethod.lightning,
-      amount: ReceiveAmount.bitcoin(payerAmountSat: amountSat),
-    );
-
-    final prepareResponse = await _sdk!.prepareReceivePayment(
-      req: prepareRequest,
-    );
-
-    final receiveRequest = ReceivePaymentRequest(
-      prepareResponse: prepareResponse,
+    return await _backend!.generateBolt11Invoice(
+      amountSat: amountSat,
       description: description,
     );
-
-    final response = await _sdk!.receivePayment(req: receiveRequest);
-    return response.destination;
   }
 
-  /// Get on-chain Bitcoin address (Liquid address for receiving)
+  /// Generate a BOLT12 offer (reusable payment address)
+  /// Returns null if the current backend doesn't support BOLT12 receive
+  Future<String?> generateBolt12Offer() async {
+    _ensureInitialized();
+    return await _backend!.generateBolt12Offer();
+  }
+
+  /// Get on-chain Bitcoin address for receiving
   Future<String> getOnChainAddress() async {
     _ensureInitialized();
-
-    final prepareRequest = PrepareReceiveRequest(
-      paymentMethod: PaymentMethod.bitcoinAddress,
-    );
-
-    final prepareResponse = await _sdk!.prepareReceivePayment(
-      req: prepareRequest,
-    );
-
-    final receiveRequest = ReceivePaymentRequest(
-      prepareResponse: prepareResponse,
-    );
-
-    final response = await _sdk!.receivePayment(req: receiveRequest);
-    return response.destination;
+    return await _backend!.getOnChainAddress();
   }
 
   /// Parse any payment input (BOLT11, BOLT12, BIP21, Lightning Address, etc.)
-  Future<InputType> parseInput(String input) async {
+  Future<ParsedInput> parseInput(String input) async {
     _ensureInitialized();
-    return await _sdk!.parse(input: input);
+    return await _backend!.parseInput(input);
   }
 
   /// Send a payment (works with BOLT11, BOLT12, Lightning Address, etc.)
-  Future<SendPaymentResponse> sendPayment({
+  Future<SendResult> sendPayment({
     required String destination,
     BigInt? amountSat,
   }) async {
     _ensureInitialized();
-
-    final prepareRequest = PrepareSendRequest(
+    return await _backend!.sendPayment(
       destination: destination,
-      amount: amountSat != null
-          ? PayAmount.bitcoin(receiverAmountSat: amountSat)
-          : null,
+      amountSat: amountSat,
     );
-
-    final prepareResponse = await _sdk!.prepareSendPayment(req: prepareRequest);
-
-    final sendRequest = SendPaymentRequest(
-      prepareResponse: prepareResponse,
-    );
-
-    return await _sdk!.sendPayment(req: sendRequest);
   }
 
   /// List all payments
-  Future<List<Payment>> listPayments() async {
+  Future<List<UnifiedPayment>> listPayments() async {
     _ensureInitialized();
-    final request = ListPaymentsRequest();
-    return await _sdk!.listPayments(req: request);
+    return await _backend!.listPayments();
   }
 
-  /// Listen to payment events
-  Stream<SdkEvent> get paymentEvents {
+  /// Stream of payment events
+  Stream<BackendEvent> get events {
     _ensureInitialized();
-    return _sdk!.addEventListener();
+    return _backend!.events;
   }
 
-  /// Disconnect the SDK
+  /// Get recommended on-chain fees
+  Future<UnifiedFees> getRecommendedFees() async {
+    _ensureInitialized();
+    return await _backend!.getRecommendedFees();
+  }
+
+  /// Disconnect the current backend
   Future<void> disconnect() async {
-    if (_sdk != null) {
-      await _sdk!.disconnect();
-      _sdk = null;
-      _isInitialized = false;
+    if (_backend != null) {
+      await _backend!.disconnect();
+      _backend = null;
       _currentWalletId = null;
+      _currentBackendType = null;
     }
   }
 
@@ -226,50 +178,50 @@ class LightningService {
   Future<void> deleteWalletDirectory(String walletId) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final walletDir = Directory('${directory.path}/wallet_$walletId');
 
-      if (await walletDir.exists()) {
-        await walletDir.delete(recursive: true);
-        SecureLogger.info('Deleted wallet directory for $walletId', tag: 'Breez');
+      // Delete directories for all possible backends
+      for (final backendType in LightningBackendType.values) {
+        final backendName = _backendTypeToString(backendType).toLowerCase();
+        final walletDir = Directory('${directory.path}/${backendName}_wallet_$walletId');
+
+        if (await walletDir.exists()) {
+          await walletDir.delete(recursive: true);
+          SecureLogger.info(
+            'Deleted $backendName wallet directory for $walletId',
+            tag: 'LightningService',
+          );
+        }
       }
     } catch (e, stack) {
-      SecureLogger.error('Failed to delete wallet directory', error: e, stackTrace: stack, tag: 'Breez');
-      // Re-throw to ensure caller knows deletion failed
+      SecureLogger.error(
+        'Failed to delete wallet directory',
+        error: e,
+        stackTrace: stack,
+        tag: 'LightningService',
+      );
       rethrow;
     }
   }
 
+  /// Create a backend instance based on the type
+  LightningBackend _createBackend(LightningBackendType type) {
+    return switch (type) {
+      LightningBackendType.liquid => LiquidBackend(),
+      LightningBackendType.spark => SparkBackend(),
+    };
+  }
+
+  /// Convert backend type to human-readable string
+  String _backendTypeToString(LightningBackendType type) {
+    return switch (type) {
+      LightningBackendType.liquid => 'Liquid',
+      LightningBackendType.spark => 'Spark',
+    };
+  }
+
   void _ensureInitialized() {
-    if (!_isInitialized || _sdk == null) {
-      throw Exception('Breez SDK not initialized');
+    if (!isInitialized || _backend == null) {
+      throw Exception('Lightning service not initialized');
     }
-  }
-
-  /// List refundable swaps (stuck funds)
-  Future<List<RefundableSwap>> listRefundables() async {
-    _ensureInitialized();
-    return await _sdk!.listRefundables();
-  }
-
-  /// Get recommended on-chain fees
-  Future<RecommendedFees> getRecommendedFees() async {
-    _ensureInitialized();
-    return await _sdk!.recommendedFees();
-  }
-
-  /// Refund a stuck swap
-  Future<RefundResponse> refundSwap({
-    required String swapAddress,
-    required String refundAddress,
-    required int feeRateSatPerVbyte,
-  }) async {
-    _ensureInitialized();
-    return await _sdk!.refund(
-      req: RefundRequest(
-        swapAddress: swapAddress,
-        refundAddress: refundAddress,
-        feeRateSatPerVbyte: feeRateSatPerVbyte,
-      ),
-    );
   }
 }
