@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_breez_liquid/flutter_breez_liquid.dart' as liquid;
+import 'package:breez_sdk_spark_flutter/breez_sdk_spark.dart' as spark;
 import 'providers/wallet_provider.dart';
 import 'services/auth_service.dart';
 import 'utils/theme.dart';
@@ -13,7 +15,10 @@ import 'screens/welcome_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Spark SDK initialization is handled in LightningService.initialize()
+  // Initialize both SDK Rust libraries (required before any SDK calls)
+  await liquid.FlutterBreezLiquid.init();
+  await spark.BreezSdkSparkLib.init();
+
   runApp(const Bolt21App());
 }
 

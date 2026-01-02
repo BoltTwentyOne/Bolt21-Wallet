@@ -13,12 +13,12 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // SECURITY: Prevent screenshots and screen recording by default
-        // This protects sensitive data like recovery phrases from being captured
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // MARKETING BUILD: Screenshots enabled for app store photos
+        // TODO: Re-enable FLAG_SECURE before production release
+        // window.setFlags(
+        //     WindowManager.LayoutParams.FLAG_SECURE,
+        //     WindowManager.LayoutParams.FLAG_SECURE
+        // )
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

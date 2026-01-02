@@ -45,7 +45,7 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: main
+      ref: "34832cae2867dda1a8bec7424f87776021f1c1ec"
       resolved-ref: "34832cae2867dda1a8bec7424f87776021f1c1ec"
       url: "https://github.com/breez/breez-sdk-spark-flutter"
     source: git
